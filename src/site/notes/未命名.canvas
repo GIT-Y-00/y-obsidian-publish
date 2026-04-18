@@ -13,26 +13,31 @@
 	</svg>
 	<div class="canvas">
 		<svg class="canvas-edges-container" style="position:absolute;width:1px;height:1px;overflow:visible;">
-			<defs><filter x="-0.1" y="-0.1" width="1.2" height="1.3" id="edge-label-bg">
+			<defs><marker id="arrow-vartextmuted" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+			<path d="M0,0.5 L5,3 L0,5.5" fill="none" stroke="var(--text-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+		</marker>
+		<marker id="arrow-vartextmuted-start" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto-start-reverse" markerUnits="strokeWidth">
+			<path d="M6,0.5 L1,3 L6,5.5" fill="none" stroke="var(--text-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+		</marker><filter x="-0.1" y="-0.1" width="1.2" height="1.3" id="edge-label-bg">
 			<feFlood flood-color="var(--background-primary)" flood-opacity="1" result="bg"/>
 			<feMerge>
 				<feMergeNode in="bg"/>
 				<feMergeNode in="SourceGraphic"/>
 			</feMerge>
-		</filter></defs>
+		</filter></defs><path d="M 220 -340 C 335.4469575172945 -340, 384.5530424827055 -270, 500 -270" fill="none" stroke="var(--text-muted)" stroke-width="2" class="canvas-edge" data-edge-id="c66ded77795417cc"  marker-end="url(#arrow-vartextmuted)" />
 		</svg>
-		<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/说明书.md" style="transform: translate(0px, -360px); width: 420px; height: 420px; ">
+		<div class="canvas-node canvas-node-text " data-node-id="526fbb2956ac69b1" style="transform: translate(500px, -300px); width: 260px; height: 60px; ">
+	<div class="canvas-node-container">
+		<div class="canvas-node-content markdown-rendered">
+			<div class="canvas-node-text-content" data-markdown="5rWL6K+V5LiA5LiL77yf"></div>
+		</div>
+	</div>
+</div>
+<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/说明书.md" style="transform: translate(-200px, -380px); width: 420px; height: 80px; ">
 	<div class="canvas-node-label">说明书</div>
 	<div class="canvas-node-container">
 		<div class="canvas-node-content markdown-embed">
 			<iframe src="/vault///" class="canvas-file-iframe" loading="lazy"></iframe>
-		</div>
-	</div>
-</div>
-<div class="canvas-node canvas-node-text " data-node-id="526fbb2956ac69b1" style="transform: translate(500px, -300px); width: 260px; height: 60px; ">
-	<div class="canvas-node-container">
-		<div class="canvas-node-content markdown-rendered">
-			<div class="canvas-node-text-content" data-markdown="5rWL6K+V5LiA5LiL77yf"></div>
 		</div>
 	</div>
 </div>
