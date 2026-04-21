@@ -26,11 +26,11 @@
 			</feMerge>
 		</filter></defs><path d="M 260 -230 C 337.6659513557904 -230, 342.3340486442096 -340, 420 -340" fill="none" stroke="var(--text-muted)" stroke-width="2" class="canvas-edge" data-edge-id="c66ded77795417cc"  marker-end="url(#arrow-vartextmuted)" />
 		</svg>
-		<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/说明书.md" style="transform: translate(-200px, -380px); width: 460px; height: 300px; ">
-	<div class="canvas-node-label">说明书</div>
+		<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/000testlink000.md" style="transform: translate(-200px, -380px); width: 460px; height: 300px; ">
+	<div class="canvas-node-label">000testlink000</div>
 	<div class="canvas-node-container">
 		<div class="canvas-node-content markdown-embed">
-			<iframe src="/vault///" class="canvas-file-iframe" loading="lazy"></iframe>
+			<iframe src="/vault/000testlink000//" class="canvas-file-iframe" loading="lazy"></iframe>
 		</div>
 	</div>
 </div>
