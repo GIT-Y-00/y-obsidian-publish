@@ -80,44 +80,45 @@ function resolveFilePath(fileName) {
   return fileMapCache[fileName] || fileMapCache[`${fileName}.md`] || fileMapCache[`${fileName}.canvas`];
 }
 
-// 2. 替换原有的 getAnchorAttributes 函数
 function getAnchorAttributes(filePath, linkTitle) {
-  let fileName = filePath.replaceAll("&amp;", "&");
+  // 1. 清洗输入：去掉可能因为 JSON 转义残留的引号、反斜杠等垃圾字符
+  let fileName = filePath.replaceAll("&amp;", "&").replace(/["\\]/g, "");
+  
   let header = "";
   let headerLinkPath = "";
-  if (filePath.includes("#")) {
-    [fileName, header] = filePath.split("#");
+  if (fileName.includes("#")) {
+    [fileName, header] = fileName.split("#");
     headerLinkPath = `#${headerToId(header)}`;
   }
 
   let noteIcon = process.env.NOTE_ICON_DEFAULT;
   const title = linkTitle ? linkTitle : fileName;
-  let permalink = `/notes/${slugify(filePath)}`; 
+  let permalink = `/notes/${slugify(fileName)}`; 
   let deadLink = false;
 
   try {
-    // 💡 摄像头 1：记录当前正在处理哪个链接
+    // 💡 摄像头 1：记录清洗后的干净名字
     console.log(`\n[DEBUG-LINK] 开始解析链接: "${fileName}"`);
 
-    const resolved = resolveFilePath(fileName);
+    // 2. 剥离前缀：如果传入的是 "Vault/1234test"，我们只拿 "1234test" 去缓存里找
+    const searchName = path.basename(fileName);
+    const resolved = resolveFilePath(searchName);
+
     if (!resolved) {
-      // 💡 摄像头 2：如果找不到文件
-      console.log(`[DEBUG-LINK] ❌ 找不到文件: "${fileName}"。请检查文件是否被推送到 src/site/notes/`);
+      console.log(`[DEBUG-LINK] ❌ 找不到文件: "${searchName}"`);
       throw new Error("File not found in any folder"); 
     }
 
-    // 💡 摄像头 3：如果找到了，打印真实路径
     console.log(`[DEBUG-LINK] ✅ 找到文件，真实路径为: "${resolved.fullPath}"`);
 
     const fullPath = resolved.fullPath;
+    
+    // 生成最终的正确链接，包含完整的父级文件夹路径
     permalink = `/notes/${slugify(resolved.pathWithoutExt)}`;
 
     const file = fs.readFileSync(fullPath, "utf8");
     const frontMatter = matter(file, matterOptions);
     
-    // 💡 摄像头 4：打印 YAML 解析结果
-    console.log(`[DEBUG-LINK] 📄 YAML 解析成功`);
-
     if (frontMatter.data.permalink) {
       permalink = frontMatter.data.permalink; 
     }
@@ -128,7 +129,6 @@ function getAnchorAttributes(filePath, linkTitle) {
       noteIcon = frontMatter.data.noteIcon;
     }
   } catch (error) {
-    // 💡 摄像头 5：捕获确切的死因
     console.log(`[DEBUG-LINK] 🚨 发生错误导致 404:`, error.message);
     deadLink = true;
   }
