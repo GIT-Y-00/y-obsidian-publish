@@ -92,60 +92,55 @@ function getAnchorAttributes(filePath, linkTitle) {
 
   let noteIcon = process.env.NOTE_ICON_DEFAULT;
   const title = linkTitle ? linkTitle : fileName;
-  
-  // 这里的初始 permalink 只是保底，下面会更新它
   let permalink = `/notes/${slugify(filePath)}`; 
   let deadLink = false;
 
   try {
-    // --- 核心修复：用雷达搜索真实路径，而不是死板拼凑 ---
+    // 💡 摄像头 1：记录当前正在处理哪个链接
+    console.log(`\n[DEBUG-LINK] 开始解析链接: "${fileName}"`);
+
     const resolved = resolveFilePath(fileName);
     if (!resolved) {
-      throw new Error("File not found in any folder"); // 找不到就扔给 catch
+      // 💡 摄像头 2：如果找不到文件
+      console.log(`[DEBUG-LINK] ❌ 找不到文件: "${fileName}"。请检查文件是否被推送到 src/site/notes/`);
+      throw new Error("File not found in any folder"); 
     }
 
+    // 💡 摄像头 3：如果找到了，打印真实路径
+    console.log(`[DEBUG-LINK] ✅ 找到文件，真实路径为: "${resolved.fullPath}"`);
+
     const fullPath = resolved.fullPath;
-    
-    // 💡 满足你的需求：自动将探测到的 folder 补齐到 permalink 中！
     permalink = `/notes/${slugify(resolved.pathWithoutExt)}`;
 
     const file = fs.readFileSync(fullPath, "utf8");
-    // ----------------------------------------------------
-
     const frontMatter = matter(file, matterOptions);
+    
+    // 💡 摄像头 4：打印 YAML 解析结果
+    console.log(`[DEBUG-LINK] 📄 YAML 解析成功`);
+
     if (frontMatter.data.permalink) {
-      permalink = frontMatter.data.permalink; // 如果 YAML 里指定了永久链接，则优先
+      permalink = frontMatter.data.permalink; 
     }
-    if (
-      frontMatter.data.tags &&
-      frontMatter.data.tags.indexOf("gardenEntry") != -1
-    ) {
+    if (frontMatter.data.tags && frontMatter.data.tags.indexOf("gardenEntry") != -1) {
       permalink = "/";
     }
     if (frontMatter.data.noteIcon) {
       noteIcon = frontMatter.data.noteIcon;
     }
-  } catch {
+  } catch (error) {
+    // 💡 摄像头 5：捕获确切的死因
+    console.log(`[DEBUG-LINK] 🚨 发生错误导致 404:`, error.message);
     deadLink = true;
   }
 
   if (deadLink) {
     return {
-      attributes: {
-        "class": "internal-link is-unresolved",
-        "href": "/404",
-        "target": "",
-      },
+      attributes: { "class": "internal-link is-unresolved", "href": "/404", "target": "" },
       innerHTML: title,
     }
   }
   return {
-    attributes: {
-      "class": "internal-link",
-      "target": "",
-      "data-note-icon": noteIcon,
-      "href": `${permalink}${headerLinkPath}`,
-    },
+    attributes: { "class": "internal-link", "target": "", "data-note-icon": noteIcon, "href": `${permalink}${headerLinkPath}` },
     innerHTML: title,
   }
 }
