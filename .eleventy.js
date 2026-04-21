@@ -1,6 +1,5 @@
 const slugify = require("@sindresorhus/slugify");
 const markdownIt = require("markdown-it");
-const fs = require("fs");
 const matter = require("gray-matter");
 const path = require('path');
 // Obsidian writes [[Page\|Alias]] in frontmatter, but \| is an invalid YAML
