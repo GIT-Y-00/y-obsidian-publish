@@ -1,9 +1,9 @@
 ---
-{"dg-publish":true,"permalink":"/vault//","tags":["book"],"dg-note-properties":{"tags":["book"]}}
+{"dg-publish":true,"permalink":"/vault/123testlink123/","tags":["book"],"dg-note-properties":{"tags":["book"]}}
 ---
 
 
-[[Vault/说明书\|说明书]]
+[[Vault/123testlink123\|123testlink123]]
 
 ### 产品部件名称 1
 
