@@ -24,20 +24,20 @@
 				<feMergeNode in="bg"/>
 				<feMergeNode in="SourceGraphic"/>
 			</feMerge>
-		</filter></defs><path d="M 220 -340 C 335.4469575172945 -340, 384.5530424827055 -270, 500 -270" fill="none" stroke="var(--text-muted)" stroke-width="2" class="canvas-edge" data-edge-id="c66ded77795417cc"  marker-end="url(#arrow-vartextmuted)" />
+		</filter></defs><path d="M 260 -230 C 337.6659513557904 -230, 342.3340486442096 -340, 420 -340" fill="none" stroke="var(--text-muted)" stroke-width="2" class="canvas-edge" data-edge-id="c66ded77795417cc"  marker-end="url(#arrow-vartextmuted)" />
 		</svg>
-		<div class="canvas-node canvas-node-text " data-node-id="526fbb2956ac69b1" style="transform: translate(500px, -300px); width: 260px; height: 60px; ">
-	<div class="canvas-node-container">
-		<div class="canvas-node-content markdown-rendered">
-			<div class="canvas-node-text-content" data-markdown="5rWL6K+V5LiA5LiL77yf"></div>
-		</div>
-	</div>
-</div>
-<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/说明书.md" style="transform: translate(-200px, -380px); width: 420px; height: 80px; ">
+		<div class="canvas-node canvas-node-file " data-node-id="b069224fc70226df" data-file-path="Vault/说明书.md" style="transform: translate(-200px, -380px); width: 460px; height: 300px; ">
 	<div class="canvas-node-label">说明书</div>
 	<div class="canvas-node-container">
 		<div class="canvas-node-content markdown-embed">
 			<iframe src="/vault///" class="canvas-file-iframe" loading="lazy"></iframe>
+		</div>
+	</div>
+</div>
+<div class="canvas-node canvas-node-text " data-node-id="526fbb2956ac69b1" style="transform: translate(420px, -370px); width: 260px; height: 60px; ">
+	<div class="canvas-node-container">
+		<div class="canvas-node-content markdown-rendered">
+			<div class="canvas-node-text-content" data-markdown="5rWL6K+V5LiA5LiL77yf"></div>
 		</div>
 	</div>
 </div>
