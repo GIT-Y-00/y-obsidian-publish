@@ -354,16 +354,31 @@ module.exports = function(eleventyConfig) {
     return date && date.toISOString();
   });
 
-  eleventyConfig.addFilter("link", function(str) {
+eleventyConfig.addFilter("link", function(str) {
     return (
       str &&
-      str.replace(/\[\[(.*?\|.*?)\]\]/g, function(match, p1) {
-        //Check if it is an embedded excalidraw drawing or mathjax javascript
+      // 注意：有的版本这里正则可能是 /\[\[(.*?)\]\]/g，请保持你原本的正则前缀不变
+      str.replace(/\[\[(.*?)\]\]/g, function(match, p1, offset, fullString) {
+        // 1. 保留原本的 Excalidraw 数组和 MathJax 防误伤逻辑
         if (p1.indexOf("],[") > -1 || p1.indexOf('"$"') > -1) {
           return match;
         }
         const [fileLink, linkTitle] = p1.split("|");
 
+        // 2. 雷达检测：看看这个双链前面是不是 JSON 的 "link":" 属性
+        // 往前看 15 个字符，涵盖可能出现的空格
+        const prefix = fullString.substring(Math.max(0, offset - 15), offset);
+        const isJsonLink = prefix.includes('"link":"') || prefix.includes('"link": "');
+
+        if (isJsonLink) {
+          // 3. 如果在 JSON 中，照常生成 HTML 标签，但用正则把纯 URL 抠出来！
+          const fullAnchorHtml = getAnchorLink(fileLink, linkTitle);
+          const hrefMatch = fullAnchorHtml.match(/href=['"](.*?)['"]/);
+          // 如果成功抠出链接，就返回干净的链接；否则退回原始状态
+          return hrefMatch ? hrefMatch[1] : match; 
+        }
+
+        // 4. 如果不在 JSON 中，作为普通正文处理，返回完整的 <a> 标签
         return getAnchorLink(fileLink, linkTitle);
       })
     );
@@ -610,16 +625,25 @@ module.exports = function(eleventyConfig) {
   function convertCanvasLinks(str) {
     return (
       str &&
-      str.replace(/\[\[(.*?\|.*?)\]\]/g, function(match, p1) {
+      str.replace(/\[\[(.*?)\]\]/g, function(match, p1, offset, fullString) {
         if (p1.indexOf("],[") > -1 || p1.indexOf('"$"') > -1) {
           return match;
         }
         const [fileLink, linkTitle] = p1.split("|");
+        
+        const prefix = fullString.substring(Math.max(0, offset - 15), offset);
+        const isJsonLink = prefix.includes('"link":"') || prefix.includes('"link": "');
+
+        if (isJsonLink) {
+          const fullAnchorHtml = getAnchorLink(fileLink, linkTitle);
+          const hrefMatch = fullAnchorHtml.match(/href=['"](.*?)['"]/);
+          return hrefMatch ? hrefMatch[1] : match;
+        }
+
         return getAnchorLink(fileLink, linkTitle);
       })
     );
   }
-
   // Helper function to convert tags in canvas text nodes (same logic as taggify filter)
   function convertCanvasTags(str) {
     return (
