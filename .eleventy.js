@@ -1,6 +1,5 @@
 const slugify = require("@sindresorhus/slugify");
 const markdownIt = require("markdown-it");
-const fs = require("fs");
 const matter = require("gray-matter");
 // Obsidian writes [[Page\|Alias]] in frontmatter, but \| is an invalid YAML
 // escape sequence. This custom engine strips \| before parsing. Shared between
@@ -49,62 +48,99 @@ function getAnchorLink(filePath, linkTitle) {
   return `<a ${Object.keys(attributes).map(key => `${key}='${attributes[key]}'`).join(" ")}>${innerHTML}</a>`;
 }
 
+const fs = require('fs');
+const path = require('path');
+
+// 1. 新增：全局缓存的递归搜索器（找出笔记所在的真实文件夹）
+let fileMapCache = null;
+function resolveFilePath(fileName) {
+  if (!fileMapCache) {
+    fileMapCache = {};
+    function walk(dir) {
+      const list = fs.readdirSync(dir);
+      list.forEach(function(file) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat && stat.isDirectory()) {
+          walk(fullPath); // 递归遍历子文件夹
+        } else {
+          // 提取带文件夹的相对路径，例如 "folder/000testlink000"
+          const relativePath = fullPath.split('src/site/notes/')[1];
+          const pathWithoutExt = relativePath.replace(/\.(md|canvas)$/, "");
+
+          const data = { fullPath, pathWithoutExt };
+          fileMapCache[file] = data; // 存带后缀的："000testlink000.md"
+          const baseName = path.basename(file, path.extname(file));
+          fileMapCache[baseName] = data; // 存不带后缀的："000testlink000"
+        }
+      });
+    }
+    walk("./src/site/notes/");
+  }
+  return fileMapCache[fileName] || fileMapCache[`${fileName}.md`] || fileMapCache[`${fileName}.canvas`];
+}
+
 function getAnchorAttributes(filePath, linkTitle) {
-  let fileName = filePath.replaceAll("&amp;", "&");
+  // 1. 清洗输入：去掉可能因 JSON 转义残留的引号、反斜杠等垃圾字符
+  let fileName = filePath.replaceAll("&amp;", "&").replace(/["\\]/g, "");
+  
   let header = "";
   let headerLinkPath = "";
-  if (filePath.includes("#")) {
-    [fileName, header] = filePath.split("#");
+  if (fileName.includes("#")) {
+    [fileName, header] = fileName.split("#");
     headerLinkPath = `#${headerToId(header)}`;
   }
 
   let noteIcon = process.env.NOTE_ICON_DEFAULT;
   const title = linkTitle ? linkTitle : fileName;
-  let permalink = `/notes/${slugify(filePath)}`;
+  let permalink = `/notes/${slugify(fileName)}`; 
   let deadLink = false;
+
   try {
-    const startPath = "./src/site/notes/";
-    let fullPath;
-    if (fileName.endsWith(".md") || fileName.endsWith(".canvas")) {
-      fullPath = `${startPath}${fileName}`;
-    } else {
-      fullPath = `${startPath}${fileName}.md`;
+    // 💡 摄像头 1：记录清洗后的干净名字
+    console.log(`\n[DEBUG-LINK] 开始解析链接: "${fileName}"`);
+
+    // 2. 剥离前缀：如果传入的是 "Vault/1234test"，我们只拿 "1234test" 去缓存里找
+    const searchName = path.basename(fileName);
+    const resolved = resolveFilePath(searchName);
+
+    if (!resolved) {
+      console.log(`[DEBUG-LINK] ❌ 找不到文件: "${searchName}"`);
+      throw new Error("File not found in any folder"); 
     }
+
+    console.log(`[DEBUG-LINK] ✅ 找到文件，真实路径为: "${resolved.fullPath}"`);
+
+    const fullPath = resolved.fullPath;
+    
+    // 生成最终的正确链接，包含完整的父级文件夹路径
+    permalink = `/notes/${slugify(resolved.pathWithoutExt)}`;
+
     const file = fs.readFileSync(fullPath, "utf8");
     const frontMatter = matter(file, matterOptions);
+    
     if (frontMatter.data.permalink) {
-      permalink = frontMatter.data.permalink;
+      permalink = frontMatter.data.permalink; 
     }
-    if (
-      frontMatter.data.tags &&
-      frontMatter.data.tags.indexOf("gardenEntry") != -1
-    ) {
+    if (frontMatter.data.tags && frontMatter.data.tags.indexOf("gardenEntry") != -1) {
       permalink = "/";
     }
     if (frontMatter.data.noteIcon) {
       noteIcon = frontMatter.data.noteIcon;
     }
-  } catch {
+  } catch (error) {
+    console.log(`[DEBUG-LINK] 🚨 发生错误导致 404:`, error.message);
     deadLink = true;
   }
 
   if (deadLink) {
     return {
-      attributes: {
-        "class": "internal-link is-unresolved",
-        "href": "/404",
-        "target": "",
-      },
+      attributes: { "class": "internal-link is-unresolved", "href": "/404", "target": "" },
       innerHTML: title,
     }
   }
   return {
-    attributes: {
-      "class": "internal-link",
-      "target": "",
-      "data-note-icon": noteIcon,
-      "href": `${permalink}${headerLinkPath}`,
-    },
+    attributes: { "class": "internal-link", "target": "", "data-note-icon": noteIcon, "href": `${permalink}${headerLinkPath}` },
     innerHTML: title,
   }
 }
