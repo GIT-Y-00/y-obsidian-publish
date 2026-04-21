@@ -45,7 +45,8 @@ function transformImage(src, cls, alt, sizes, widths = ["500", "700", "auto"]) {
 
 function getAnchorLink(filePath, linkTitle) {
   const { attributes, innerHTML } = getAnchorAttributes(filePath, linkTitle);
-  return `<a ${Object.keys(attributes).map(key => `${key}="${attributes[key]}"`).join(" ")}>${innerHTML}</a>`;
+  // 注意看下面这段，把双引号改成了单引号：`${key}='${attributes[key]}'`
+  return `<a ${Object.keys(attributes).map(key => `${key}='${attributes[key]}'`).join(" ")}>${innerHTML}</a>`;
 }
 
 function getAnchorAttributes(filePath, linkTitle) {
