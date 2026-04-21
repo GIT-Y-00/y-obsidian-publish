@@ -2,6 +2,7 @@ const slugify = require("@sindresorhus/slugify");
 const markdownIt = require("markdown-it");
 const fs = require("fs");
 const matter = require("gray-matter");
+const path = require('path');
 // Obsidian writes [[Page\|Alias]] in frontmatter, but \| is an invalid YAML
 // escape sequence. This custom engine strips \| before parsing. Shared between
 // Eleventy's own frontmatter parser and the manual matter() call in
@@ -49,6 +50,36 @@ function getAnchorLink(filePath, linkTitle) {
   return `<a ${Object.keys(attributes).map(key => `${key}='${attributes[key]}'`).join(" ")}>${innerHTML}</a>`;
 }
 
+// 1. 新增：全局缓存的递归搜索器（找出笔记所在的真实文件夹）
+let fileMapCache = null;
+function resolveFilePath(fileName) {
+  if (!fileMapCache) {
+    fileMapCache = {};
+    function walk(dir) {
+      const list = fs.readdirSync(dir);
+      list.forEach(function(file) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat && stat.isDirectory()) {
+          walk(fullPath); // 递归遍历子文件夹
+        } else {
+          // 提取带文件夹的相对路径，例如 "folder/000testlink000"
+          const relativePath = fullPath.split('src/site/notes/')[1];
+          const pathWithoutExt = relativePath.replace(/\.(md|canvas)$/, "");
+
+          const data = { fullPath, pathWithoutExt };
+          fileMapCache[file] = data; // 存带后缀的："000testlink000.md"
+          const baseName = path.basename(file, path.extname(file));
+          fileMapCache[baseName] = data; // 存不带后缀的："000testlink000"
+        }
+      });
+    }
+    walk("./src/site/notes/");
+  }
+  return fileMapCache[fileName] || fileMapCache[`${fileName}.md`] || fileMapCache[`${fileName}.canvas`];
+}
+
+// 2. 替换原有的 getAnchorAttributes 函数
 function getAnchorAttributes(filePath, linkTitle) {
   let fileName = filePath.replaceAll("&amp;", "&");
   let header = "";
@@ -60,20 +91,29 @@ function getAnchorAttributes(filePath, linkTitle) {
 
   let noteIcon = process.env.NOTE_ICON_DEFAULT;
   const title = linkTitle ? linkTitle : fileName;
-  let permalink = `/notes/${slugify(filePath)}`;
+  
+  // 这里的初始 permalink 只是保底，下面会更新它
+  let permalink = `/notes/${slugify(filePath)}`; 
   let deadLink = false;
+
   try {
-    const startPath = "./src/site/notes/";
-    let fullPath;
-    if (fileName.endsWith(".md") || fileName.endsWith(".canvas")) {
-      fullPath = `${startPath}${fileName}`;
-    } else {
-      fullPath = `${startPath}${fileName}.md`;
+    // --- 核心修复：用雷达搜索真实路径，而不是死板拼凑 ---
+    const resolved = resolveFilePath(fileName);
+    if (!resolved) {
+      throw new Error("File not found in any folder"); // 找不到就扔给 catch
     }
+
+    const fullPath = resolved.fullPath;
+    
+    // 💡 满足你的需求：自动将探测到的 folder 补齐到 permalink 中！
+    permalink = `/notes/${slugify(resolved.pathWithoutExt)}`;
+
     const file = fs.readFileSync(fullPath, "utf8");
+    // ----------------------------------------------------
+
     const frontMatter = matter(file, matterOptions);
     if (frontMatter.data.permalink) {
-      permalink = frontMatter.data.permalink;
+      permalink = frontMatter.data.permalink; // 如果 YAML 里指定了永久链接，则优先
     }
     if (
       frontMatter.data.tags &&
