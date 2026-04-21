@@ -81,7 +81,7 @@ function resolveFilePath(fileName) {
 }
 
 function getAnchorAttributes(filePath, linkTitle) {
-  // 1. 清洗输入：去掉可能因为 JSON 转义残留的引号、反斜杠等垃圾字符
+  // 1. 清洗输入：去掉可能因 JSON 转义残留的引号、反斜杠等垃圾字符
   let fileName = filePath.replaceAll("&amp;", "&").replace(/["\\]/g, "");
   
   let header = "";
