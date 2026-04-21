@@ -1,7 +1,6 @@
 const slugify = require("@sindresorhus/slugify");
 const markdownIt = require("markdown-it");
 const matter = require("gray-matter");
-const path = require('path');
 // Obsidian writes [[Page\|Alias]] in frontmatter, but \| is an invalid YAML
 // escape sequence. This custom engine strips \| before parsing. Shared between
 // Eleventy's own frontmatter parser and the manual matter() call in
