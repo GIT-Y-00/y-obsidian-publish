@@ -50,6 +50,9 @@ function getAnchorLink(filePath, linkTitle) {
   return `<a ${Object.keys(attributes).map(key => `${key}='${attributes[key]}'`).join(" ")}>${innerHTML}</a>`;
 }
 
+const fs = require('fs');
+const path = require('path');
+
 // 1. 新增：全局缓存的递归搜索器（找出笔记所在的真实文件夹）
 let fileMapCache = null;
 function resolveFilePath(fileName) {
