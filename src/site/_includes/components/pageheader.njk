@@ -60,14 +60,3 @@
 {% endif %}
 <style>
 </style>
-
-<script>
-  // 等待 DOM 加载完成
-  document.addEventListener("DOMContentLoaded", function() {
-    // 核心侦测逻辑：如果当前窗口 (self) 不等于顶级窗口 (top)，说明我们在 iframe 里！
-    if (window.self !== window.top) {
-      // 给 body 强行打上一个 'is-embedded' 的思想钢印 (CSS class)
-      document.body.classList.add("is-embedded");
-    }
-  });
-</script>
