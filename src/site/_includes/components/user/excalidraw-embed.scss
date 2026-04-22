@@ -1,0 +1,32 @@
+/* ======================================================
+   Excalidraw 嵌入模式 (Iframe 障眼法) 专属样式
+   ====================================================== */
+body.is-embedded {
+    /* 1. 强制隐藏所有不需要的页面框架 UI */
+    .sidebar,              /* 左侧边栏 */
+    .filetree-sidebar,     /* 文件树侧边栏 */
+    .navbar,               /* 顶部导航栏 */
+    .site-header,          /* 页面头部 */
+    .toc,                  /* 右侧目录 */
+    .toc-container,        /* 目录容器 */
+    footer,                /* 页面底部版权 */
+    .search-button,        /* 悬浮搜索按钮 */
+    #graph-component       /* 页面底部的关系图谱 (你之前排查过的那个) */
+    {
+        display: none !important; 
+    }
+
+    /* 2. 解除正文容器的宽度限制，让其100%填满 Excalidraw 给的方框 */
+    .content, 
+    main {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 10px !important; /* 留一点点呼吸空间 */
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* 3. 抹除网页整体的背景色，使其完美融入 Excalidraw 画板的底色 */
+    background-color: transparent !important;
+    background-image: none !important;
+}

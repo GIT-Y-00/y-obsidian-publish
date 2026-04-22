@@ -1,0 +1,8 @@
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // 如果当前窗口 (self) 不等于最顶层窗口 (top)，说明网页正被嵌套在 iframe 里
+    if (window.self !== window.top) {
+      document.body.classList.add("is-embedded");
+    }
+  });
+</script>
