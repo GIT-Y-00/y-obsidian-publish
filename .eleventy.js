@@ -1,5 +1,6 @@
 const slugify = require("@sindresorhus/slugify");
 const markdownIt = require("markdown-it");
+const fs = require("fs");
 const matter = require("gray-matter");
 // Obsidian writes [[Page\|Alias]] in frontmatter, but \| is an invalid YAML
 // escape sequence. This custom engine strips \| before parsing. Shared between
@@ -44,103 +45,65 @@ function transformImage(src, cls, alt, sizes, widths = ["500", "700", "auto"]) {
 
 function getAnchorLink(filePath, linkTitle) {
   const { attributes, innerHTML } = getAnchorAttributes(filePath, linkTitle);
-  // 注意看下面这段，把双引号改成了单引号：`${key}='${attributes[key]}'`
-  return `<a ${Object.keys(attributes).map(key => `${key}='${attributes[key]}'`).join(" ")}>${innerHTML}</a>`;
-}
-
-const fs = require('fs');
-const path = require('path');
-
-// 1. 新增：全局缓存的递归搜索器（找出笔记所在的真实文件夹）
-let fileMapCache = null;
-function resolveFilePath(fileName) {
-  if (!fileMapCache) {
-    fileMapCache = {};
-    function walk(dir) {
-      const list = fs.readdirSync(dir);
-      list.forEach(function(file) {
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-        if (stat && stat.isDirectory()) {
-          walk(fullPath); // 递归遍历子文件夹
-        } else {
-          // 提取带文件夹的相对路径，例如 "folder/000testlink000"
-          const relativePath = fullPath.split('src/site/notes/')[1];
-          const pathWithoutExt = relativePath.replace(/\.(md|canvas)$/, "");
-
-          const data = { fullPath, pathWithoutExt };
-          fileMapCache[file] = data; // 存带后缀的："000testlink000.md"
-          const baseName = path.basename(file, path.extname(file));
-          fileMapCache[baseName] = data; // 存不带后缀的："000testlink000"
-        }
-      });
-    }
-    walk("./src/site/notes/");
-  }
-  return fileMapCache[fileName] || fileMapCache[`${fileName}.md`] || fileMapCache[`${fileName}.canvas`];
+  return `<a ${Object.keys(attributes).map(key => `${key}="${attributes[key]}"`).join(" ")}>${innerHTML}</a>`;
 }
 
 function getAnchorAttributes(filePath, linkTitle) {
-  // 1. 清洗输入：去掉可能因 JSON 转义残留的引号、反斜杠等垃圾字符
-  let fileName = filePath.replaceAll("&amp;", "&").replace(/["\\]/g, "");
-  
+  let fileName = filePath.replaceAll("&amp;", "&");
   let header = "";
   let headerLinkPath = "";
-  if (fileName.includes("#")) {
-    [fileName, header] = fileName.split("#");
+  if (filePath.includes("#")) {
+    [fileName, header] = filePath.split("#");
     headerLinkPath = `#${headerToId(header)}`;
   }
 
   let noteIcon = process.env.NOTE_ICON_DEFAULT;
   const title = linkTitle ? linkTitle : fileName;
-  let permalink = `/notes/${slugify(fileName)}`; 
+  let permalink = `/notes/${slugify(filePath)}`;
   let deadLink = false;
-
   try {
-    // 💡 摄像头 1：记录清洗后的干净名字
-    console.log(`\n[DEBUG-LINK] 开始解析链接: "${fileName}"`);
-
-    // 2. 剥离前缀：如果传入的是 "Vault/1234test"，我们只拿 "1234test" 去缓存里找
-    const searchName = path.basename(fileName);
-    const resolved = resolveFilePath(searchName);
-
-    if (!resolved) {
-      console.log(`[DEBUG-LINK] ❌ 找不到文件: "${searchName}"`);
-      throw new Error("File not found in any folder"); 
+    const startPath = "./src/site/notes/";
+    let fullPath;
+    if (fileName.endsWith(".md") || fileName.endsWith(".canvas")) {
+      fullPath = `${startPath}${fileName}`;
+    } else {
+      fullPath = `${startPath}${fileName}.md`;
     }
-
-    console.log(`[DEBUG-LINK] ✅ 找到文件，真实路径为: "${resolved.fullPath}"`);
-
-    const fullPath = resolved.fullPath;
-    
-    // 生成最终的正确链接，包含完整的父级文件夹路径
-    permalink = `/notes/${slugify(resolved.pathWithoutExt)}`;
-
     const file = fs.readFileSync(fullPath, "utf8");
     const frontMatter = matter(file, matterOptions);
-    
     if (frontMatter.data.permalink) {
-      permalink = frontMatter.data.permalink; 
+      permalink = frontMatter.data.permalink;
     }
-    if (frontMatter.data.tags && frontMatter.data.tags.indexOf("gardenEntry") != -1) {
+    if (
+      frontMatter.data.tags &&
+      frontMatter.data.tags.indexOf("gardenEntry") != -1
+    ) {
       permalink = "/";
     }
     if (frontMatter.data.noteIcon) {
       noteIcon = frontMatter.data.noteIcon;
     }
-  } catch (error) {
-    console.log(`[DEBUG-LINK] 🚨 发生错误导致 404:`, error.message);
+  } catch {
     deadLink = true;
   }
 
   if (deadLink) {
     return {
-      attributes: { "class": "internal-link is-unresolved", "href": "/404", "target": "" },
+      attributes: {
+        "class": "internal-link is-unresolved",
+        "href": "/404",
+        "target": "",
+      },
       innerHTML: title,
     }
   }
   return {
-    attributes: { "class": "internal-link", "target": "", "data-note-icon": noteIcon, "href": `${permalink}${headerLinkPath}` },
+    attributes: {
+      "class": "internal-link",
+      "target": "",
+      "data-note-icon": noteIcon,
+      "href": `${permalink}${headerLinkPath}`,
+    },
     innerHTML: title,
   }
 }
@@ -390,31 +353,16 @@ module.exports = function(eleventyConfig) {
     return date && date.toISOString();
   });
 
-eleventyConfig.addFilter("link", function(str) {
+  eleventyConfig.addFilter("link", function(str) {
     return (
       str &&
-      // 注意：有的版本这里正则可能是 /\[\[(.*?)\]\]/g，请保持你原本的正则前缀不变
-      str.replace(/\[\[(.*?)\]\]/g, function(match, p1, offset, fullString) {
-        // 1. 保留原本的 Excalidraw 数组和 MathJax 防误伤逻辑
+      str.replace(/\[\[(.*?\|.*?)\]\]/g, function(match, p1) {
+        //Check if it is an embedded excalidraw drawing or mathjax javascript
         if (p1.indexOf("],[") > -1 || p1.indexOf('"$"') > -1) {
           return match;
         }
         const [fileLink, linkTitle] = p1.split("|");
 
-        // 2. 雷达检测：看看这个双链前面是不是 JSON 的 "link":" 属性
-        // 往前看 15 个字符，涵盖可能出现的空格
-        const prefix = fullString.substring(Math.max(0, offset - 15), offset);
-        const isJsonLink = prefix.includes('"link":"') || prefix.includes('"link": "');
-
-        if (isJsonLink) {
-          // 3. 如果在 JSON 中，照常生成 HTML 标签，但用正则把纯 URL 抠出来！
-          const fullAnchorHtml = getAnchorLink(fileLink, linkTitle);
-          const hrefMatch = fullAnchorHtml.match(/href=['"](.*?)['"]/);
-          // 如果成功抠出链接，就返回干净的链接；否则退回原始状态
-          return hrefMatch ? hrefMatch[1] : match; 
-        }
-
-        // 4. 如果不在 JSON 中，作为普通正文处理，返回完整的 <a> 标签
         return getAnchorLink(fileLink, linkTitle);
       })
     );
@@ -661,25 +609,16 @@ eleventyConfig.addFilter("link", function(str) {
   function convertCanvasLinks(str) {
     return (
       str &&
-      str.replace(/\[\[(.*?)\]\]/g, function(match, p1, offset, fullString) {
+      str.replace(/\[\[(.*?\|.*?)\]\]/g, function(match, p1) {
         if (p1.indexOf("],[") > -1 || p1.indexOf('"$"') > -1) {
           return match;
         }
         const [fileLink, linkTitle] = p1.split("|");
-        
-        const prefix = fullString.substring(Math.max(0, offset - 15), offset);
-        const isJsonLink = prefix.includes('"link":"') || prefix.includes('"link": "');
-
-        if (isJsonLink) {
-          const fullAnchorHtml = getAnchorLink(fileLink, linkTitle);
-          const hrefMatch = fullAnchorHtml.match(/href=['"](.*?)['"]/);
-          return hrefMatch ? hrefMatch[1] : match;
-        }
-
         return getAnchorLink(fileLink, linkTitle);
       })
     );
   }
+
   // Helper function to convert tags in canvas text nodes (same logic as taggify filter)
   function convertCanvasTags(str) {
     return (
@@ -837,4 +776,3 @@ eleventyConfig.addFilter("link", function(str) {
     passthroughFileCopy: true,
   };
 };
-

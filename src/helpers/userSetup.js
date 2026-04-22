@@ -1,30 +1,84 @@
+const fs = require('fs');
+const path = require('path');
+
 function userMarkdownSetup(md) {
-  // The md parameter stands for the markdown-it instance used throughout the site generator.
-  // Feel free to add any plugin you want here instead of /.eleventy.js
+  // 保持空，或按需添加
 }
+
 function userEleventySetup(eleventyConfig) {
-  // The eleventyConfig parameter stands for the the config instantiated in /.eleventy.js.
-  // Feel free to add any plugin you want here instead of /.eleventy.js
-  // 终极补丁：全局拦截 Excalidraw，极简 UI + 自动焦点转移
-  eleventyConfig.addTransform("excalidraw-iframe-injector", function(content, outputPath) {
+
+  // =========================================================================
+  // 1. 全局缓存的文件搜索雷达 (只在构建时初始化一次，极速查找文件真实路径)
+  // =========================================================================
+  let fileMapCache = null;
+  function resolveFilePath(fileName) {
+    if (!fileMapCache) {
+      fileMapCache = {};
+      function walk(dir) {
+        if (!fs.existsSync(dir)) return;
+        const list = fs.readdirSync(dir);
+        list.forEach(function(file) {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          if (stat && stat.isDirectory()) {
+            walk(fullPath); 
+          } else {
+            // 兼容 Mac/Linux 和 Windows 的路径分隔符
+            const relativePath = fullPath.split('src/site/notes/')[1] || fullPath.split('src\\site\\notes\\')[1];
+            if (!relativePath) return;
+            const pathWithoutExt = relativePath.replace(/\.(md|canvas)$/, "");
+            const data = { fullPath, pathWithoutExt };
+            fileMapCache[file] = data; 
+            const baseName = path.basename(file, path.extname(file));
+            fileMapCache[baseName] = data; 
+          }
+        });
+      }
+      walk("./src/site/notes/");
+    }
+    // 清洗可能残留的脏字符
+    let cleanName = fileName.replace(/["\\]/g, "").split("#")[0];
+    const searchName = path.basename(cleanName);
+    return fileMapCache[searchName] || fileMapCache[`${searchName}.md`] || fileMapCache[`${searchName}.canvas`];
+  }
+
+
+  // =========================================================================
+  // 2. 终极拦截器：一站式修复 JSON崩溃 + 路径404 + 注入React交互
+  // =========================================================================
+  eleventyConfig.addTransform("excalidraw-ultimate-fixer", function(content, outputPath) {
     if (outputPath && outputPath.endsWith(".html") && content.includes("ExcalidrawLib.Excalidraw")) {
       
-      return content.replace(
+      // 【修复阶段 A：拨乱反正，拯救被官方代码破坏的 JSON 和 404】
+      // 官方代码会生成错误格式： "link":"<a class="internal-link" href="/404">笔记名</a>"
+      // 我们用正则把这坨乱码抓出来，提取“笔记名”，算出真实路径，重写为干净的 "link":"/notes/folder/笔记名/"
+      let fixedContent = content.replace(
+        /("link"\s*:\s*)"?<a\s+[^>]*>([\s\S]*?)<\/a>"?/g,
+        function(match, prefix, fileName) {
+          const resolved = resolveFilePath(fileName);
+          if (resolved) {
+            // 动态调用官方的 slugify，确保生成的 URL 和全站标准完全一致
+            const slugify = eleventyConfig.getFilter("slugify") || eleventyConfig.getFilter("slug");
+            const cleanUrl = `/notes/${slugify(resolved.pathWithoutExt)}/`;
+            return `${prefix}"${cleanUrl}"`; // 返回纯净、正确的属性
+          }
+          return `${prefix}"/404"`; // 真的找不到，才返回 404
+        }
+      );
+
+      // 【修复阶段 B：注入完美交互体验的 React 组件】
+      fixedContent = fixedContent.replace(
         /React\.createElement\(ExcalidrawLib\.Excalidraw,\s*\{/,
         `((excalidrawProps) => {
           if (!window.DgExcalidrawWrapper) {
             window.DgExcalidrawWrapper = function(props) {
               const [isInteractive, setIsInteractive] = React.useState(false);
-              // 1. 新增：创建一个对 iframe DOM 元素的引用
               const iframeRef = React.useRef(null);
 
-              // 2. 新增：监听 isInteractive 的变化，自动转移焦点
               React.useEffect(() => {
                 if (isInteractive && iframeRef.current) {
-                  // 开启时：强行把浏览器的焦点塞给 iframe，无需额外点击即可滚动
                   iframeRef.current.focus();
                 } else if (!isInteractive) {
-                  // 关闭时：如果焦点还在 iframe 里，把它拔出来，还给顶级网页 (Excalidraw)
                   if (document.activeElement === iframeRef.current) {
                     iframeRef.current.blur();
                   }
@@ -37,7 +91,7 @@ function userEleventySetup(eleventyConfig) {
               },
                 React.createElement("button", {
                   onPointerDown: function(e) { 
-                    e.preventDefault(); // 防止按钮自身抢走浏览器的默认焦点
+                    e.preventDefault(); 
                     e.stopPropagation(); 
                     setIsInteractive(!isInteractive); 
                   },
@@ -50,11 +104,10 @@ function userEleventySetup(eleventyConfig) {
                     fontSize: "12px", fontWeight: "bold", cursor: "pointer", 
                     pointerEvents: "auto", opacity: 0.9
                   }
-                // 3. 极简文案
                 }, isInteractive ? "内嵌交互: 开" : "内嵌交互: 关"),
 
                 React.createElement("iframe", {
-                  ref: iframeRef, // 绑定引用
+                  ref: iframeRef, 
                   src: props.link,
                   loading: "lazy",
                   style: { 
@@ -84,10 +137,12 @@ function userEleventySetup(eleventyConfig) {
           return React.createElement(ExcalidrawLib.Excalidraw, excalidrawProps);
         })({`
       );
+
+      return fixedContent;
     }
     return content;
   });
-  
 }
+
 exports.userMarkdownSetup = userMarkdownSetup;
 exports.userEleventySetup = userEleventySetup;
