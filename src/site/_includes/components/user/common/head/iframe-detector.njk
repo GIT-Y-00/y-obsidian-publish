@@ -1,8 +1,70 @@
 <script>
+  // 1. Iframe UI 障眼法：如果在 iframe 里，则隐藏侧边栏等
   document.addEventListener("DOMContentLoaded", function() {
-    // 如果当前窗口 (self) 不等于最顶层窗口 (top)，说明网页正被嵌套在 iframe 里
     if (window.self !== window.top) {
       document.body.classList.add("is-embedded");
+    }
+  });
+
+  // 2. 纯前端 React 劫持：彻底终结后端正则拼接的噩梦
+  // 我们通过拦截全局的 React.createElement，在画板被画出来的一瞬间，强行塞入交互代码
+  let _ReactObj;
+  Object.defineProperty(window, 'React', {
+    get: function() { return _ReactObj; },
+    set: function(val) {
+      _ReactObj = val;
+      
+      if (_ReactObj && _ReactObj.createElement && !_ReactObj.__isHijacked) {
+        _ReactObj.__isHijacked = true;
+        const originalCreateElement = _ReactObj.createElement;
+        
+        _ReactObj.createElement = function(type, props, ...children) {
+          // 当系统准备渲染 Excalidraw 组件时，我们出手拦截
+          if (type && type.name === 'Excalidraw') {
+            if (props) {
+              // 注入安全白名单
+              props.validateEmbeddable = () => true;
+              
+              // 注入点击交互包装器
+              props.renderEmbeddable = (node) => {
+                if (node.link) {
+                  // 防御套娃
+                  if (window.self !== window.top) {
+                    return originalCreateElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", background: "#f8f9fa", border: "2px dashed #d1d5db", borderRadius: "8px" } }, 
+                      originalCreateElement("a", { href: node.link, target: "_top", style: { color: "#3b82f6", textDecoration: "none", fontWeight: "bold", pointerEvents: "auto" } }, "🔗 嵌套过多，点击查看")
+                    );
+                  }
+
+                  // 核心交互组件
+                  const Wrapper = function() {
+                    const [isActive, setIsActive] = _ReactObj.useState(false);
+                    const iframeRef = _ReactObj.useRef(null);
+
+                    _ReactObj.useEffect(() => {
+                      if (isActive && iframeRef.current) iframeRef.current.focus();
+                      else if (!isActive && document.activeElement === iframeRef.current) iframeRef.current.blur();
+                    }, [isActive]);
+
+                    return originalCreateElement("div", { style: { position: "relative", width: "100%", height: "100%", boxSizing: "border-box", pointerEvents: "none" } },
+                      originalCreateElement("button", {
+                        onPointerDown: e => { e.preventDefault(); e.stopPropagation(); setIsActive(!isActive); },
+                        style: { position: "absolute", top: "8px", right: "8px", zIndex: 50, padding: "6px 10px", background: isActive ? "#ef4444" : "#3b82f6", color: "white", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", pointerEvents: "auto", opacity: 0.9 }
+                      }, isActive ? "内嵌交互: 开" : "内嵌交互: 关"),
+                      originalCreateElement("iframe", {
+                        ref: iframeRef, src: node.link, loading: "lazy", style: { width: "100%", height: "100%", border: "none", borderRadius: "8px", boxShadow: isActive ? "0 0 0 2px #3b82f6 inset" : "none", transition: "box-shadow 0.2s", pointerEvents: isActive ? "auto" : "none" }
+                      })
+                    );
+                  };
+                  return originalCreateElement(Wrapper, { key: node.id });
+                }
+                return null;
+              };
+            }
+          }
+          // 放行其他普通组件
+          return originalCreateElement.apply(this, [type, props, ...children]);
+        };
+      }
     }
   });
 </script>
