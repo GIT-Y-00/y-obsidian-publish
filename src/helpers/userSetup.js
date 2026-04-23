@@ -8,7 +8,7 @@ function userMarkdownSetup(md) {
 function userEleventySetup(eleventyConfig) {
 
   // =========================================================================
-  // 1. 全局缓存的文件搜索雷达 (只在构建时初始化一次，极速查找文件真实路径)
+  // 1. 全局缓存的文件搜索雷达
   // =========================================================================
   let fileMapCache = null;
   function resolveFilePath(fileName) {
@@ -23,7 +23,6 @@ function userEleventySetup(eleventyConfig) {
           if (stat && stat.isDirectory()) {
             walk(fullPath); 
           } else {
-            // 兼容 Mac/Linux 和 Windows 的路径分隔符
             const relativePath = fullPath.split('src/site/notes/')[1] || fullPath.split('src\\site\\notes\\')[1];
             if (!relativePath) return;
             const pathWithoutExt = relativePath.replace(/\.(md|canvas)$/, "");
@@ -36,12 +35,10 @@ function userEleventySetup(eleventyConfig) {
       }
       walk("./src/site/notes/");
     }
-    // 清洗可能残留的脏字符
     let cleanName = fileName.replace(/["\\]/g, "").split("#")[0];
     const searchName = path.basename(cleanName);
     return fileMapCache[searchName] || fileMapCache[`${searchName}.md`] || fileMapCache[`${searchName}.canvas`];
   }
-
 
   // =========================================================================
   // 2. 终极拦截器：一站式修复 JSON崩溃 + 路径404 + 注入React交互
@@ -49,24 +46,35 @@ function userEleventySetup(eleventyConfig) {
   eleventyConfig.addTransform("excalidraw-ultimate-fixer", function(content, outputPath) {
     if (outputPath && outputPath.endsWith(".html") && content.includes("ExcalidrawLib.Excalidraw")) {
       
-      // 【修复阶段 A：拨乱反正，拯救被官方代码破坏的 JSON 和 404】
-      // 官方代码会生成错误格式： "link":"<a class="internal-link" href="/404">笔记名</a>"
-      // 我们用正则把这坨乱码抓出来，提取“笔记名”，算出真实路径，重写为干净的 "link":"/notes/folder/笔记名/"
+      // 【修复阶段 A：精确解析 JSON 字符串，暴力清除括号，映射真实路径】
+      // 这里使用了 (?:[^"\\]|\\.)* 来完美兼容带有转义符 \" 的复杂 JSON 字符串，绝不会再破坏语法
       let fixedContent = content.replace(
-        /("link"\s*:\s*)"?<a\s+[^>]*>([\s\S]*?)<\/a>"?/g,
-        function(match, prefix, fileName) {
-          const resolved = resolveFilePath(fileName);
-          if (resolved) {
-            // 动态调用官方的 slugify，确保生成的 URL 和全站标准完全一致
-            const slugify = eleventyConfig.getFilter("slugify") || eleventyConfig.getFilter("slug");
-            const cleanUrl = `/notes/${slugify(resolved.pathWithoutExt)}/`;
-            return `${prefix}"${cleanUrl}"`; // 返回纯净、正确的属性
+        /("link"\s*:\s*)"((?:[^"\\]|\\.)*)"/g,
+        function(match, prefix, rawValue) {
+          // 只对包含 <a> 标签 或 中括号 的字符串进行修复
+          if (rawValue.includes("<a ") || rawValue.includes("[")) {
+            // 1. 无情剥离所有 HTML 标签
+            let cleanName = rawValue.replace(/<[^>]+>/g, "");
+            // 2. 暴力剥离所有的 [ 和 ]（完美解决 [1234testlink1234]] 问题）
+            cleanName = cleanName.replace(/\[|\]/g, "");
+            // 3. 剥除转义反斜杠，去掉锚点，拿到最纯净的文件名
+            cleanName = cleanName.replace(/\\/g, "").trim().split("#")[0];
+
+            const resolved = resolveFilePath(cleanName);
+            if (resolved) {
+              const slugify = eleventyConfig.getFilter("slugify") || eleventyConfig.getFilter("slug");
+              const cleanUrl = `/notes/${slugify(resolved.pathWithoutExt)}/`;
+              return `${prefix}"${cleanUrl}"`;
+            }
+            // 如果真的找不到，返回纯净的 /404 字符串，保护 JSON 结构不崩溃
+            return `${prefix}"/404"`;
           }
-          return `${prefix}"/404"`; // 真的找不到，才返回 404
+          // 如果是普通的 URL (http://) 或 null，原样返回，不破坏数据
+          return match;
         }
       );
 
-      // 【修复阶段 B：注入完美交互体验的 React 组件】
+      // 【修复阶段 B：注入完美交互体验的 React 组件 (完全沿用你的黄金版本)】
       fixedContent = fixedContent.replace(
         /React\.createElement\(ExcalidrawLib\.Excalidraw,\s*\{/,
         `((excalidrawProps) => {
