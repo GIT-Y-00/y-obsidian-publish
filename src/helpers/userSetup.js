@@ -24,7 +24,7 @@ function userEleventySetup(eleventyConfig) {
           } else {
             // 获取相对于 notes 文件夹的路径 (兼容 Mac 和 Windows)
             const relative = fullPath.split(/src[\\\/]site[\\\/]notes[\\\/]/)[1];
-            if (!relativePath) continue;
+            if (!relative) continue;  // ✅ 修复：relativePath → relative
             
             const withoutExt = relative.replace(/\.(md|canvas)$/, '');
             
@@ -44,8 +44,13 @@ function userEleventySetup(eleventyConfig) {
       walk("./src/site/notes/");
     }
 
-    // 终极清洗：不管它是 [1234test]] 还是 [[1234test，一律暴力剔除所有括号、HTML标签和特殊符号
-    let cleanName = fileName.replace(/<[^>]*>/g, '').replace(/[\[\]"\\]/g, '').split('#')[0].trim().toLowerCase();
+    // 终极清洗：剔除所有括号、HTML标签、管道符、锚点，统一小写
+    let cleanName = fileName
+      .replace(/<[^>]*>/g, '')
+      .replace(/[\[\]"\\|]/g, '')  // ✅ 新增管道符 '|' 清洗
+      .split('#')[0]
+      .trim()
+      .toLowerCase();
     return fileMapCache[cleanName];
   }
 
@@ -59,7 +64,7 @@ function userEleventySetup(eleventyConfig) {
     }
 
     // 【第一部分：修复跳转地址】
-    // 专门精准定位 JSON 里的 "link":"..."，哪怕里面残留了奇怪的括号
+    // 精准定位 JSON 里的 "link":"..."，哪怕里面残留了奇怪的括号
     content = content.replace(/("link"\s*:\s*)"([^"]+)"/g, (match, prefix, rawLink) => {
       // 如果原本就是外链或 404，不作处理
       if (!rawLink || rawLink.startsWith('http') || rawLink.startsWith('/') || rawLink === 'null') {
@@ -76,8 +81,9 @@ function userEleventySetup(eleventyConfig) {
 
 
     // 【第二部分：注入你测试通过的完美交互组件】
+    // 使用全局替换，支持页面中出现多个 Excalidraw 实例
     content = content.replace(
-      /React\.createElement\(ExcalidrawLib\.Excalidraw,\s*\{/,
+      /React\.createElement\(ExcalidrawLib\.Excalidraw,\s*\{/g,  // ✅ 添加全局标志 'g'
       `((excalidrawProps) => {
         if (!window.DgExWrapper) {
           window.DgExWrapper = function(props) {
