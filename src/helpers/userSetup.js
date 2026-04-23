@@ -50,19 +50,31 @@ function userEleventySetup(eleventyConfig) {
     if (outputPath && outputPath.endsWith(".html") && content.includes("ExcalidrawLib.Excalidraw")) {
       
       // 【修复阶段 A：拨乱反正，拯救被官方代码破坏的 JSON 和 404】
-      // 官方代码会生成错误格式： "link":"<a class="internal-link" href="/404">笔记名</a>"
-      // 我们用正则把这坨乱码抓出来，提取“笔记名”，算出真实路径，重写为干净的 "link":"/notes/folder/笔记名/"
+      // 兼容 JSON 里的各种奇葩状态："<a href=...>[[文件名]]</a>" 或 "[[文件名]]" 或 "[文件名]]" 或带转义的乱码
       let fixedContent = content.replace(
-        /("link"\s*:\s*)"?<a\s+[^>]*>([\s\S]*?)<\/a>"?/g,
-        function(match, prefix, fileName) {
-          const resolved = resolveFilePath(fileName);
+        /("link"\s*:\s*)"((?:\\"|[^"])*)"/g,
+        function(match, prefix, rawLink) {
+          // 1. 暴力清洗，提取最纯净的笔记名称
+          let cleanName = rawLink.replace(/<[^>]+>/g, ""); // 第一步：无情剥离所有 HTML 标签 (例如 <a>...</a>)
+          cleanName = cleanName.replace(/^\[+(.*?)\]+$/, "$1"); // 第二步：智能剥离首尾的中括号 [ 和 ]（无论一边有几个，统统剥掉！）
+          cleanName = cleanName.replace(/\\/g, "").trim(); // 第三步：剥除转义用的反斜杠和多余空格
+          cleanName = cleanName.split("#")[0]; // 第四步：去掉可能的 # 锚点
+
+          // 如果提取出来是空的，或者原本就是合法的外部链接 (http)，保持原样
+          if (!cleanName || cleanName.startsWith("http") || cleanName === "/404") {
+            return match;
+          }
+
+          // 2. 将纯净的名字扔进雷达搜索
+          const resolved = resolveFilePath(cleanName);
           if (resolved) {
             // 动态调用官方的 slugify，确保生成的 URL 和全站标准完全一致
             const slugify = eleventyConfig.getFilter("slugify") || eleventyConfig.getFilter("slug");
             const cleanUrl = `/notes/${slugify(resolved.pathWithoutExt)}/`;
-            return `${prefix}"${cleanUrl}"`; // 返回纯净、正确的属性
+            return `${prefix}"${cleanUrl}"`; // 返回纯净、正确的 URL 属性
           }
-          return `${prefix}"/404"`; // 真的找不到，才返回 404
+          
+          return match; // 如果系统里真没这个文件，就不动它
         }
       );
 
